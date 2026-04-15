@@ -1,0 +1,20 @@
+<div class="home-container">
+  <header class="hero-section">
+    <div class="hero-content">
+      <h1>{{ title }}</h1>
+      <p>{{ subtitle }}</p>
+    </div>
+  </header>
+
+  <main class="features-section">
+    <div class="container">
+      <h2>Características Principales</h2>
+      <div class="features-grid">
+        <div class="feature-card" *ngFor="let feature of features">
+          <h3>{{ feature.title }}</h3>
+          <p>{{ feature.description }}</p>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
