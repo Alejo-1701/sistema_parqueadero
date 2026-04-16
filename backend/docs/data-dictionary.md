@@ -24,6 +24,7 @@ Hoy el backend puede divergir de este documento en nombres de tablas, columnas (
 | `tenants`, `tenant_id` | No modelado aún en entidades |
 | `people` (campos EN + tenant) | `people` (`Person`) con columnas en español y sin `tenant_id` |
 | `accounts`, `roles`, `account_roles` | Autenticación: entidad `User` → tabla `users` |
+| `platform_accounts` (SUPERADMIN) | No modelado aún (sin `tenant_id`) |
 | `apartments`, `residents` | `residential_units`, `residential_assignments` |
 | `parking_lots`, `vehicle_categories`, `rates`, `invoices`, `prices` | `parking_spaces`, `parking_records` |
 | — | Tablas legacy `usuarios`, `vehiculos` (PK entera, distinto dominio de usuarios de `auth`) |
@@ -41,7 +42,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 - **snake_case** para tablas/columnas.
 - Tablas en **plural** (ej. `tenants`, `people`).
 - Llave primaria: `id UUID PRIMARY KEY DEFAULT gen_random_uuid()`.
-- Aislamiento multi-tenant: toda tabla funcional incluye `tenant_id UUID NOT NULL`.
+- Aislamiento multi-tenant: toda tabla funcional incluye `tenant_id UUID NOT NULL` (excepción: cuentas de **plataforma** en `platform_accounts`, sin `tenant_id`).
 - Timestamps: `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`, `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`.
 
 ## Modelo multi-tenant
@@ -137,6 +138,15 @@ CREATE TABLE accounts (
 
 En vez de codificar roles en múltiples tablas, definir roles y su asignación.
 
+**Dos alcances:**
+
+| Alcance | Dónde vive | Quién |
+|---------|------------|--------|
+| **Tenant** | Tabla `roles` + `account_roles` + cuentas en `accounts` | Usuarios del conjunto/cliente (`tenant_id` obligatorio en filas de negocio). |
+| **Plataforma** | Tabla `platform_accounts` (sin `tenant_id`) | Operadores del proveedor del software; rol v1: **`SUPERADMIN`** (puede actuar sobre **cualquier** tenant según políticas de la API). |
+
+`SUPERADMIN` **no** se inserta en `roles`: esa tabla exige `tenant_id` y describe perfiles **dentro** de un tenant. `ADMIN` es administrador **de ese tenant**; no cruza datos de otros clientes salvo que se le conceda explícitamente (no recomendado).
+
 #### `roles`
 
 ```sql
@@ -166,6 +176,36 @@ CREATE TABLE roles (
 | `LESSEE` | Lessee | Arrendatario / ocupante por contrato de arriendo (no confundir con tabla `tenants` SaaS) | Se usa **LESSEE** en lugar de `TENANT` como código de rol para no chocar con “tenant multi-inquilino”. |
 | `VISITOR` | Visitor | Acceso limitado o invitado (portal de visita, pre-registro, etc.) | Alcance según reglas de la app. |
 
+Los códigos anteriores son **exclusivos del catálogo tenant**; no incluyen `SUPERADMIN`.
+
+#### `platform_accounts`
+
+Cuentas del **operador de plataforma** (sin `tenant_id`). Autenticación y autorización deben distinguirse de `accounts` (JWT distinto, `aud`/claim de plataforma, o ruta `/platform/auth` según diseño de API).
+
+```sql
+CREATE TABLE platform_accounts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+
+  role_code VARCHAR(40) NOT NULL DEFAULT 'SUPERADMIN'
+    CHECK (role_code IN ('SUPERADMIN')),
+
+  last_login_at TIMESTAMPTZ,
+  failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+  locked_until TIMESTAMPTZ,
+
+  status VARCHAR(20) NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active','inactive','blocked')),
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+> Ampliaciones futuras (p. ej. `SUPPORT`, `BILLING`): extender el `CHECK` de `role_code` o migrar a tabla `platform_roles` si el catálogo crece.
+
 **Semilla recomendada** (cada fila por tenant; ajustar `tenant_id`):
 
 ```sql
@@ -183,10 +223,11 @@ Nuevos roles tras v1: añadir fila aquí en el diccionario + migración/seed + p
 
 ### Implementación en código (fuera de este documento)
 
-El catálogo anterior es **normativo para el modelo objetivo**; el repositorio puede seguir usando valores distintos hasta que se implemente la alineación. Tareas típicas (asignación sugerida: **Alejo**):
+El catálogo tenant y `platform_accounts` son **normativos para el modelo objetivo**; el repositorio puede seguir usando valores distintos hasta que se implemente la alineación. Tareas típicas (asignación sugerida: **Alejo**):
 
-1. Sustituir enums / strings legacy (`usuarios`: `admin` / `operador` / `cliente`; `users` en auth: default `user`; frontend: `user.model`) por los códigos en inglés de la tabla de catálogo, con migración de datos si aplica.
+1. Sustituir enums / strings legacy (`usuarios`: `admin` / `operador` / `cliente`; `users` en auth: default `user`; frontend: `user.model`) por los códigos en inglés de la tabla de catálogo **tenant**, con migración de datos si aplica.
 2. Tras el cambio de esquema, ejecutar (o adaptar) la migración SQL de abajo en cada entorno.
+3. Implementar tabla y flujo **`platform_accounts`** / **SUPERADMIN** (login, JWT o claims separados de tenant, endpoints que cruzan `tenant_id` con controles estrictos). Seguimiento: [issue #30](https://github.com/Alejo-1701/sistema_parqueadero/issues/30).
 
 **Migración de datos (referencia)** — ejecutar cuando el código ya persista los códigos en inglés en columnas compatibles (`VARCHAR` recomendado frente a `ENUM` nativo si los valores pueden evolucionar):
 
@@ -200,7 +241,7 @@ END
 WHERE rol IN ('admin', 'operador', 'cliente');
 ```
 
-Seguimiento en GitHub: [issue #29](https://github.com/Alejo-1701/sistema_parqueadero/issues/29) (asignada a Alejo).
+Seguimiento en GitHub: [issue #29](https://github.com/Alejo-1701/sistema_parqueadero/issues/29) (roles tenant en código legacy); [issue #30](https://github.com/Alejo-1701/sistema_parqueadero/issues/30) (`platform_accounts` / SUPERADMIN).
 
 #### `account_roles`
 
@@ -548,6 +589,7 @@ CREATE TABLE pqrs (
 
 Relaciones del **modelo objetivo** descrito arriba; contrastar con la sección **Implementación actual (NestJS / TypeORM)** si el código aún no está migrado.
 
+- `platform_accounts` (**SUPERADMIN**): sin FK a `tenants`; la relación es **lógica** (la API permite operar sobre cualquier `tenant_id` con autorización y auditoría).
 - `tenants (1) -> (N) people`
 - `tenants (1) -> (N) accounts`
 - `people (1) -> (N) requests` (as requester / responder)

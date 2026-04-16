@@ -20,6 +20,10 @@ Sistema de gestión de parqueaderos residenciales con arquitectura **multi-tenan
 ### 3.1 Esquema Multi-Tenant
 
 ```
+platform_accounts (SUPERADMIN, sin tenant_id)
+        │
+        │ (gestión cross-tenant: crear/configurar tenants)
+        ▼
 tenants (1) ──────► (N) people
                   ──────► (N) accounts
                   ──────► (N) apartments
@@ -27,6 +31,8 @@ tenants (1) ──────► (N) people
                   ──────► (N) pqrs
                   ──────► (N) notifications
 ```
+
+`platform_accounts` representa operadores del **proveedor** del software (`SUPERADMIN`). Las cuentas en `accounts` pertenecen siempre a **un** `tenant_id` (administración **del** conjunto, no de toda la plataforma).
 
 ### 3.2 Entidades Base
 
@@ -37,6 +43,7 @@ tenants (1) ──────► (N) people
 | `accounts` | Credenciales de acceso | → tenants, → people (opcional) |
 | `roles` | Roles de usuario | → tenants |
 | `account_roles` | Asignación rol-cuenta | → tenants, → accounts, → roles |
+| `platform_accounts` | Cuenta plataforma (`SUPERADMIN`) | Sin `tenant_id`; acceso cross-tenant acotado por API |
 
 ### 3.3 Modelo Residencial
 
@@ -78,9 +85,10 @@ src/
 │   └── app.config.ts          # app.module
 ├── modules/
 │   ├── tenants/              # Módulo de tenants
+│   ├── platform/              # Cuentas plataforma (SUPERADMIN) — opcional / fase posterior
 │   ├── people/                # Personas
 │   ├── accounts/              # Cuentas de acceso
-│   ├── roles/                 # Roles y permisos
+│   ├── roles/                 # Roles y permisos (tenant)
 │   ├── apartments/            # Apartamentos
 │   ├── residents/             # Residentes
 │   ├── parking/               # Parqueaderos
@@ -102,9 +110,16 @@ src/
 - Lockout por intentos fallidos (configurable)
 
 ### 5.2 Autorización (RBAC)
-- Roles: ADMIN, OWNER, RESIDENT, TENANT, GUARD, VISITOR
-- Guards por módulo y acción
-- Permisos granulares
+
+**Dos planos:**
+
+| Plano | Actores | Alcance |
+|-------|---------|---------|
+| **Tenant** | `accounts` + `roles` + `account_roles` | Códigos v1: `ADMIN`, `OPERATOR`, `GUARD`, `RESIDENT`, `OWNER`, `LESSEE`, `VISITOR` (ver [diccionario de datos](../backend/docs/data-dictionary.md)). `ADMIN` = administración **dentro de ese** `tenant_id`. |
+| **Plataforma** | `platform_accounts` con `role_code = SUPERADMIN` | Operación del proveedor: alta/configuración de tenants, soporte, métricas globales. **No** usar filas en `roles` para `SUPERADMIN` (esa tabla exige `tenant_id`). |
+
+- Guards por módulo y acción; JWT o claims deben distinguir **contexto tenant** vs **contexto plataforma**.
+- Permisos granulares (fase posterior o módulo de permisos).
 
 ### 5.3 Multi-Tenancy
 - `tenant_id` en toda tabla funcional
@@ -125,6 +140,7 @@ src/
 │   ├── POST /login
 │   ├── POST /refresh
 │   └── POST /logout
+├── /platform/auth   (opcional: login SUPERADMIN, distinto de cuentas tenant)
 ├── /tenants
 │   ├── GET / (list)
 │   ├── GET /:id
