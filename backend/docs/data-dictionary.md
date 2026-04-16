@@ -144,7 +144,7 @@ CREATE TABLE roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
 
-  code VARCHAR(40) NOT NULL, -- e.g. ADMIN, OWNER, RESIDENT, TENANT, GUARD, VISITOR
+  code VARCHAR(40) NOT NULL, -- valores permitidos: catálogo fijo v1 (sección siguiente)
   name VARCHAR(80) NOT NULL,
 
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -153,6 +153,54 @@ CREATE TABLE roles (
   UNIQUE (tenant_id, code)
 );
 ```
+
+**Catálogo fijo `roles.code` (v1, inglés)** — códigos en **MAYÚSCULAS** (sin espacios); `name` es etiqueta para UI (puede traducirse).
+
+| `code` | `name` (ejemplo UI) | Responsabilidad | Notas |
+|--------|---------------------|-----------------|--------|
+| `ADMIN` | Administrator | Configuración del tenant, usuarios/cuentas, catálogos sensibles, reportes globales | Sustituye el rol legacy `admin`. |
+| `OPERATOR` | Operator | Operación diaria: registros, facturación operativa, soporte a residentes | Sustituye `operador`. |
+| `GUARD` | Security guard | Portería y control de acceso; permisos más acotados que `OPERATOR` si se separan en políticas | Opcional si en v1 `OPERATOR` cubre portería. |
+| `RESIDENT` | Resident | Autoservicio del ocupante (unidad, vehículos, visitas según producto) | Sustituye `cliente` y el default genérico `user` del módulo auth. |
+| `OWNER` | Unit owner | Titular de unidad (propietario); puede coincidir o no con quien habita | Diferencia de negocio respecto a `LESSEE`. |
+| `LESSEE` | Lessee | Arrendatario / ocupante por contrato de arriendo (no confundir con tabla `tenants` SaaS) | Se usa **LESSEE** en lugar de `TENANT` como código de rol para no chocar con “tenant multi-inquilino”. |
+| `VISITOR` | Visitor | Acceso limitado o invitado (portal de visita, pre-registro, etc.) | Alcance según reglas de la app. |
+
+**Semilla recomendada** (cada fila por tenant; ajustar `tenant_id`):
+
+```sql
+INSERT INTO roles (tenant_id, code, name) VALUES
+  ($1, 'ADMIN', 'Administrator'),
+  ($1, 'OPERATOR', 'Operator'),
+  ($1, 'GUARD', 'Security guard'),
+  ($1, 'RESIDENT', 'Resident'),
+  ($1, 'OWNER', 'Unit owner'),
+  ($1, 'LESSEE', 'Lessee'),
+  ($1, 'VISITOR', 'Visitor');
+```
+
+Nuevos roles tras v1: añadir fila aquí en el diccionario + migración/seed + políticas de autorización.
+
+### Implementación en código (fuera de este documento)
+
+El catálogo anterior es **normativo para el modelo objetivo**; el repositorio puede seguir usando valores distintos hasta que se implemente la alineación. Tareas típicas (asignación sugerida: **Alejo**):
+
+1. Sustituir enums / strings legacy (`usuarios`: `admin` / `operador` / `cliente`; `users` en auth: default `user`; frontend: `user.model`) por los códigos en inglés de la tabla de catálogo, con migración de datos si aplica.
+2. Tras el cambio de esquema, ejecutar (o adaptar) la migración SQL de abajo en cada entorno.
+
+**Migración de datos (referencia)** — ejecutar cuando el código ya persista los códigos en inglés en columnas compatibles (`VARCHAR` recomendado frente a `ENUM` nativo si los valores pueden evolucionar):
+
+```sql
+UPDATE usuarios SET rol = CASE rol
+  WHEN 'admin' THEN 'ADMIN'
+  WHEN 'operador' THEN 'OPERATOR'
+  WHEN 'cliente' THEN 'RESIDENT'
+  ELSE rol
+END
+WHERE rol IN ('admin', 'operador', 'cliente');
+```
+
+Seguimiento en GitHub: [issue #29](https://github.com/Alejo-1701/sistema_parqueadero/issues/29) (asignada a Alejo).
 
 #### `account_roles`
 
