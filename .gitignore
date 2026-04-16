@@ -1,9 +1,15 @@
-# Dependencies
+# Dependencies (cualquier nivel del monorepo)
 node_modules/
 
-# Compiled output
+# Salida de compilación / artefactos
 dist/
+build/
+out/
 out-tsc/
+.angular/
+
+# TypeScript
+*.tsbuildinfo
 
 # Environment files
 .env
@@ -11,6 +17,17 @@ out-tsc/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Cobertura de pruebas
+coverage/
+.nyc_output/
 
 # IDEs and Editors
 .vscode/
@@ -21,3 +38,6 @@ out-tsc/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Carpetas locales de trabajo (no versionar)
+_tmp/
