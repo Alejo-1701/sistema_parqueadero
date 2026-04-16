@@ -2,16 +2,33 @@
 
 ## Objetivo
 
-Proveer una **única fuente de verdad** para la estructura de la base de datos usando:
+Proveer una **especificación estable** (modelo objetivo) para la base de datos usando:
 
 - **Nombres en inglés** (tablas/columnas)
 - Soporte **multi-tenant** (el sistema puede ser usado por múltiples conjuntos/clientes)
 - **Relaciones**, **restricciones** e **índices** definidos de forma clara
 
+El DDL de este archivo es la **versión deseada** al migrar el esquema; no sustituye por sí solo el inventario de tablas generadas por TypeORM hasta que existan migraciones alineadas.
+
 > Notas
 >
 > - La generación de UUID usa `gen_random_uuid()` y requiere `pgcrypto`.
 > - `updated_at` debe ser mantenido por la aplicación o con triggers (PostgreSQL no lo actualiza automáticamente).
+
+## Implementación actual (NestJS / TypeORM)
+
+Hoy el backend puede divergir de este documento en nombres de tablas, columnas (`camelCase` en entidades sin `NamingStrategy` a `snake_case`), tipos de PK y ausencia de multi-tenant. Referencia de módulos en `backend/src/modules`:
+
+| Este diccionario (objetivo) | Código / tablas actuales aproximadas |
+|-----------------------------|--------------------------------------|
+| `tenants`, `tenant_id` | No modelado aún en entidades |
+| `people` (campos EN + tenant) | `people` (`Person`) con columnas en español y sin `tenant_id` |
+| `accounts`, `roles`, `account_roles` | Autenticación: entidad `User` → tabla `users` |
+| `apartments`, `residents` | `residential_units`, `residential_assignments` |
+| `parking_lots`, `vehicle_categories`, `rates`, `invoices`, `prices` | `parking_spaces`, `parking_records` |
+| — | Tablas legacy `usuarios`, `vehiculos` (PK entera, distinto dominio de usuarios de `auth`) |
+
+Cuando el esquema real coincida con este archivo, esta sección puede sustituirse por un enlace a migraciones o a un diagrama ER generado desde la BD.
 
 ## Extensiones requeridas
 
@@ -75,6 +92,8 @@ CREATE TABLE people (
   UNIQUE (tenant_id, email)
 );
 ```
+
+En PostgreSQL, `UNIQUE (tenant_id, email)` permite varias filas con `email IS NULL`; si el negocio exige un solo “sin email” por tenant, usar un índice único parcial (por ejemplo `WHERE email IS NOT NULL`) más una regla adicional para el caso `NULL`.
 
 **Índices (recomendados)**:
 
@@ -148,6 +167,8 @@ CREATE TABLE account_roles (
   PRIMARY KEY (tenant_id, account_id, role_id)
 );
 ```
+
+La PK incluye `tenant_id` para reforzar el aislamiento; en la práctica hay que garantizar (CHECK, trigger o aplicación) que `accounts.tenant_id`, `roles.tenant_id` y el `tenant_id` de la fila coincidan, para evitar combinaciones incoherentes.
 
 ## Solicitudes / Tickets
 
@@ -414,11 +435,9 @@ CREATE TABLE prices (
 
 ## Notificaciones y PQR
 
-### `users` (identidad de remitente del sistema)
+### Remitente de notificaciones (no confundir con una tabla `users`)
 
-Si necesitas “usuarios del sistema” que envíen notificaciones (diferentes a cuentas de login), mantén una tabla separada; de lo contrario reutiliza `accounts`.
-
-Recomendación: usar `accounts` como remitente/actor. Si se mantiene una tabla separada, debe ser multi-tenant y con nombres en inglés.
+No hace falta una tabla adicional tipo “usuarios del sistema” salvo un requisito explícito de negocio. **Recomendación:** usar `accounts` como actor que envía (`sender_account_id` en `notifications`). Si en el futuro se creara otra tabla de identidad operativa, debe ser multi-tenant y seguir las convenciones de nombres en inglés de este documento.
 
 ### `notifications`
 
@@ -478,6 +497,8 @@ CREATE TABLE pqrs (
 ```
 
 ## Resumen de relaciones
+
+Relaciones del **modelo objetivo** descrito arriba; contrastar con la sección **Implementación actual (NestJS / TypeORM)** si el código aún no está migrado.
 
 - `tenants (1) -> (N) people`
 - `tenants (1) -> (N) accounts`
