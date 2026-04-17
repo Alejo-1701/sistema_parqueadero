@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+} from 'typeorm';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 
 @Entity('vehiculos')
@@ -21,7 +28,7 @@ export class Vehiculo {
   @Column({ type: 'enum', enum: ['carro', 'moto', 'camioneta', 'bus', 'otro'] })
   tipo: string;
 
-  @ManyToOne(() => Usuario, usuario => usuario.vehiculos)
+  @ManyToOne(() => Usuario, (usuario) => usuario.vehiculos)
   propietario: Usuario;
 
   @Column()

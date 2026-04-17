@@ -87,9 +87,125 @@ THROTTLE_TTL=60
 THROTTLE_LIMIT=10
 ```
 
-## Configuración de Base de Datos
+## Configuración de Entorno
 
-### PostgreSQL
+El sistema utiliza variables de entorno para una configuración segura y flexible. Sigue estos pasos para configurar tu entorno:
+
+### 1. Configuración Inicial
+
+Copia el archivo de ejemplo y ajusta los valores:
+
+```bash
+cp .env.example .env
+```
+
+### 2. Variables Obligatorias
+
+Las siguientes variables deben estar definidas en **producción**:
+
+| Variable | Requerida | Descripción |
+|----------|-----------|------------|
+| `DB_HOST` | ✅ | Host de la base de datos |
+| `DB_PORT` | ✅ | Puerto de la base de datos |
+| `DB_USERNAME` | ✅ | Usuario de la base de datos |
+| `DB_PASSWORD` | ✅ | Contraseña de la base de datos |
+| `DB_DATABASE` | ✅ | Nombre de la base de datos |
+| `JWT_SECRET` | ✅ | Secreto para firmar tokens |
+| `NODE_ENV` | ✅ | Entorno de ejecución |
+
+### 3. Configuración por Entorno
+
+#### Desarrollo (.env)
+```env
+# Configuración para desarrollo local
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=cambiar_esta_contraseña
+DB_DATABASE=sistema_parqueadero
+
+PORT=3000
+NODE_ENV=development
+API_PREFIX=api/v1
+
+JWT_SECRET=secreto_desarrollo_no_usar_en_prod
+JWT_EXPIRES_IN=24h
+
+BCRYPT_ROUNDS=10
+THROTTLE_TTL=60
+THROTTLE_LIMIT=100
+
+# CORS permisivo para desarrollo
+CORS_ORIGINS=http://localhost:4200,http://localhost:3000
+```
+
+#### Producción (.env)
+```env
+# Configuración para producción
+DB_HOST=tu-host-de-produccion.com
+DB_PORT=5432
+DB_USERNAME=usuario_produccion
+DB_PASSWORD=contraseña_segura_produccion
+DB_DATABASE=sistema_parqueadero_produccion
+
+PORT=3000
+NODE_ENV=production
+API_PREFIX=api/v1
+
+JWT_SECRET=generar_secreto_aleatorio_muy_seguro
+JWT_EXPIRES_IN=24h
+
+BCRYPT_ROUNDS=12
+THROTTLE_TTL=60
+THROTTLE_LIMIT=10
+
+# CORS restrictivo para producción
+CORS_ORIGINS=https://midominio.com,https://api.midominio.com
+```
+
+### 4. Validación Automática y Fail-Fast
+
+El sistema implementa validación estricta de variables críticas al iniciar. Si faltan variables obligatorias en producción, el sistema fallará rápido con mensajes claros.
+
+#### Comportamiento en Producción
+
+- ✅ **Validación automática**: Verifica `JWT_SECRET`, `DB_*`, `PORT`, `NODE_ENV` al iniciar
+- ✅ **Fail-Fast**: Detiene ejecución inmediatamente si faltan variables críticas
+- ✅ **Mensajes claros**: Error específico con lista de variables faltantes
+- ✅ **Guías incluidas**: Referencias directas a documentación de configuración
+
+#### Variables Críticas Validadas
+
+| Variable | Requerida | Descripción |
+|----------|-----------|------------|
+| `JWT_SECRET` | ✅ | Secreto para firmar tokens JWT |
+| `DB_HOST` | ✅ | Host de la base de datos |
+| `DB_PORT` | ✅ | Puerto de la base de datos |
+| `DB_USERNAME` | ✅ | Usuario de la base de datos |
+| `DB_PASSWORD` | ✅ | Contraseña de la base de datos |
+| `DB_DATABASE` | ✅ | Nombre de la base de datos |
+| `PORT` | ✅ | Puerto del servidor |
+| `NODE_ENV` | ✅ | Entorno de ejecución |
+
+#### Mensajes de Error
+
+```
+❌ Variables de entorno requeridas faltantes: JWT_SECRET, DB_PASSWORD
+💡 Configuración requerida: cp .env.example .env
+🔧 Guía de configuración: https://github.com/tu-repo/backend/README.md#configuración-de-entorno
+
+Error: ❌ Variables de entorno requeridas faltantes: JWT_SECRET, DB_PASSWORD. El servidor no puede iniciar en producción sin estas variables.
+```
+
+#### Características de Seguridad Adicionales
+
+- Validación de formato para variables específicas (PORT numérico, CORS_ORIGINS con URLs válidas)
+- Sin fallbacks inseguros para variables sensibles
+- Mensajes descriptivos con emojis para fácil identificación
+
+### 5. Configuración de Base de Datos
+
+#### PostgreSQL
 1. Crear la base de datos:
 ```sql
 CREATE DATABASE sistema_parqueadero;
@@ -97,7 +213,7 @@ CREATE DATABASE sistema_parqueadero;
 
 2. El sistema se conectará automáticamente y sincronizará las tablas en modo desarrollo.
 
-### MySQL
+#### MySQL
 1. Crear la base de datos:
 ```sql
 CREATE DATABASE sistema_parqueadero;
@@ -197,6 +313,89 @@ npm run test:cov           # Ejecuta pruebas con cobertura
 | `PORT` | Puerto del servidor | `3000` |
 | `NODE_ENV` | Entorno de ejecución | `development` |
 | `API_PREFIX` | Prefijo de la API | `api/v1` |
+| `THROTTLE_TTL` | Tiempo de vida del límite (segundos) | `60` |
+| `THROTTLE_LIMIT` | Límite de peticiones por ventana | `10` |
+| `CORS_ORIGINS` | Orígenes permitidos para CORS | `http://localhost:4200` |
+
+## Configuración de Rate Limiting
+
+El sistema incluye protección contra abusos mediante rate limiting configurado globalmente. Para ajustar los límites según tu entorno:
+
+### Desarrollo (.env)
+```env
+# Límites más permisivos para desarrollo
+THROTTLE_TTL=60      # 60 segundos
+THROTTLE_LIMIT=100     # 100 peticiones por minuto
+```
+
+### Producción (.env)
+```env
+# Límites más restrictivos para producción
+THROTTLE_TTL=60      # 60 segundos
+THROTTLE_LIMIT=10      # 10 peticiones por minuto
+
+# CORS restrictivo para producción
+CORS_ORIGINS=https://midominio.com,https://api.midominio.com
+```
+
+### Personalización por Entorno
+
+Puedes ajustar estos valores según las necesidades específicas de cada entorno:
+
+- **Desarrollo**: Valores más altos para facilitar pruebas
+- **Staging**: Valores intermedios para simular producción
+- **Producción**: Valores más bajos para protección máxima
+
+El sistema mostrará un mensaje `Too many requests, please try again later` cuando se exceda el límite configurado.
+
+## Configuración de CORS
+
+El sistema incluye configuración segura de CORS con whitelist de orígenes permitidos.
+
+### Variables de Entorno
+
+| Variable | Descripción | Valor por defecto |
+|----------|-------------|-------------------|
+| `CORS_ORIGINS` | Orígenes permitidos para CORS | `http://localhost:4200` |
+
+### Configuración por Entorno
+
+#### Desarrollo (.env)
+```env
+# CORS permisivo para desarrollo local
+CORS_ORIGINS=http://localhost:4200,http://localhost:3000
+```
+
+#### Producción (.env)
+```env
+# CORS restrictivo para producción
+CORS_ORIGINS=https://midominio.com,https://api.midominio.com
+```
+
+### Comportamiento
+
+- **Desarrollo**: Se permiten múltiples orígenes locales para facilitar pruebas
+- **Producción**: Solo dominios específicos y confiables
+- **Credentials**: Solo se habilitan si hay una whitelist definida
+- **Seguridad**: No se permite `origin: true` para evitar accesos no deseados
+
+### Ejemplos de Configuración
+
+```typescript
+// app.config.ts - Configuración dinámica
+cors: {
+  origins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : ['http://localhost:4200'],
+  credentials: process.env.CORS_ORIGINS ? true : false,
+}
+
+// main.ts - Aplicación segura
+app.enableCors({
+  origin: configService.get('cors.origins'),
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+  allowedHeaders: 'Content-Type, Authorization',
+  credentials: configService.get('cors.credentials', false),
+});
+```
 
 ## Notas Importantes
 

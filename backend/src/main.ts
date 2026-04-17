@@ -4,7 +4,6 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
-import { CustomThrottlerGuard } from './common/guards/throttler.guard';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -29,20 +28,26 @@ async function bootstrap() {
   // Global interceptors
   app.useGlobalInterceptors(new ResponseInterceptor());
 
+  // Global guards are now provided via APP_GUARD in AppModule
+
   // CORS configuration
   app.enableCors({
-    origin: true,
+    origin: configService.get('cors.origins'),
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Authorization',
-    credentials: true,
+    credentials: configService.get('cors.credentials', false),
   });
 
   // Start server
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port);
 
-  console.log(`Aplicación ejecutándose en: http://localhost:${port}/${apiPrefix}`);
-  console.log(`Entorno: ${configService.get<string>('NODE_ENV', 'development')}`);
+  console.log(
+    `Aplicación ejecutándose en: http://localhost:${port}/${apiPrefix}`,
+  );
+  console.log(
+    `Entorno: ${configService.get<string>('NODE_ENV', 'development')}`,
+  );
 }
 
 bootstrap();

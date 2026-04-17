@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from 'typeorm';
 import { Vehiculo } from '../../vehiculos/entities/vehiculo.entity';
 
 @Entity('usuarios')
@@ -24,10 +31,14 @@ export class Usuario {
   @Column({ default: true })
   activo: boolean;
 
-  @Column({ type: 'enum', enum: ['admin', 'operador', 'cliente'], default: 'cliente' })
+  @Column({
+    type: 'enum',
+    enum: ['admin', 'operador', 'cliente'],
+    default: 'cliente',
+  })
   rol: string;
 
-  @OneToMany(() => Vehiculo, vehiculo => vehiculo.propietario)
+  @OneToMany(() => Vehiculo, (vehiculo) => vehiculo.propietario)
   vehiculos: Vehiculo[];
 
   @CreateDateColumn()
