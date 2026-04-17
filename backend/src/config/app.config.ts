@@ -22,7 +22,7 @@ export default () => {
       );
       console.error('💡 Configuración requerida: cp .env.example .env');
       console.error(
-        '🔧 Guía de configuración: https://github.com/tu-repo/backend/README.md#configuración-de-entorno',
+        '🔧 Guía de configuración: https://github.com/Alejo-1701/sistema_parqueadero/blob/main/backend/README.md#configuración-de-entorno',
       );
 
       throw new Error(
