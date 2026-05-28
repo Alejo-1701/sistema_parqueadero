@@ -7,6 +7,9 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import appConfig from './config/app.config';
 import { getDatabaseConfig } from './config/database.config';
+import { TenantsModule } from './modules/tenants/tenants.module';
+import { AccountsModule } from './modules/accounts/accounts.module';
+import { RolesModule } from './modules/roles/roles.module';
 
 @Module({
   imports: [
@@ -29,6 +32,9 @@ import { getDatabaseConfig } from './config/database.config';
       ],
       inject: [ConfigService],
     }),
+    TenantsModule,
+    AccountsModule,
+    RolesModule,
   ],
   controllers: [AppController],
   providers: [
@@ -39,4 +45,4 @@ import { getDatabaseConfig } from './config/database.config';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

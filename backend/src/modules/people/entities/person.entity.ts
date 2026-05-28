@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 
 @Entity('people')
@@ -11,30 +12,52 @@ export class Person {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
-  tipoDocumento: 'CC' | 'TI' | 'CE';
+  @Column({ name: 'tenant_id' })
+  tenantId: string;
 
-  @Column({ unique: true })
-  numeroDocumento: string;
+  @Column({
+    name: 'document_type',
+    type: 'enum',
+    enum: ['CC', 'CE', 'TI', 'PP', 'NIT'],
+  })
+  documentType: 'CC' | 'CE' | 'TI' | 'PP' | 'NIT';
 
-  @Column()
-  nombre: string;
+  @Column({ name: 'document_number' })
+  @Index(['tenantId', 'documentNumber'], { unique: true })
+  documentNumber: string;
 
-  @Column()
-  apellido: string;
+  @Column({ name: 'first_name' })
+  firstName: string;
+
+  @Column({ name: 'last_name' })
+  lastName: string;
 
   @Column({ nullable: true })
-  telefono?: string;
+  phone?: string;
 
   @Column({ nullable: true })
+  @Index(['tenantId', 'email'], { unique: true })
   email?: string;
 
-  @Column({ default: 'ACTIVO' })
-  estado: 'ACTIVO' | 'INACTIVO';
+  @Column({ nullable: true })
+  address?: string;
 
-  @CreateDateColumn()
+  @Column({ nullable: true })
+  city?: string;
+
+  @Column({ name: 'birth_date', type: 'date', nullable: true })
+  birthDate?: Date;
+
+  @Column({
+    type: 'enum',
+    enum: ['active', 'inactive', 'suspended'],
+    default: 'active',
+  })
+  status: 'active' | 'inactive' | 'suspended';
+
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
