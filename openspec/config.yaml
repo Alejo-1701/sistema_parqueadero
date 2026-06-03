@@ -1,0 +1,26 @@
+context: >
+  Sistema de parqueadero residencial multi-tenant.
+  Backend NestJS 11 + TypeORM + PostgreSQL.
+  Frontend Angular.
+  Monorepo.
+
+strict_tdd: false
+
+testing:
+  runner: jest
+  layers:
+    unit: true
+    integration: false
+    e2e: false
+  coverage: true
+  lint: eslint
+  format: prettier
+
+phases:
+  proposal: true
+  spec: true
+  design: true
+  tasks: true
+  apply: true
+  verify: true
+  archive: true

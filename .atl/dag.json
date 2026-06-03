@@ -1,0 +1,161 @@
+{
+  "$schema": "./dag-schema.json",
+  "version": "1.0",
+  "description": "Workflow DAG para sistema_parqueadero — NestJS + Angular monorepo",
+  "rules": {
+    "atomicidad": "REGLAMENTARIA. Si un nodo tiene atomic=false, DEBE descomponerse hasta que todos los sub-nodos sean atomic=true. Ningún nodo compuesto puede pasar a la fase siguiente sin descomposición completa.",
+    "responsabilidad_unica": "Cada nodo atómico debe tener UNA sola responsabilidad, ser ejecutable independientemente, y ser verificable en aislamiento.",
+    "herencia_subdag": "Un sub-DAG hereda el flujo del DAG padre (triage → implementer → reviewer).",
+    "ciclo_de_vida": "Todo nodo atómico sigue esta secuencia de estados: pending → in_progress → awaiting_review → done. El implementer SOLO puede pasar a awaiting_review, NUNCA a done. El reviewer es el UNICO que puede pasar a done. Una vez done, se invoca reporte para generar informe y commit message. El usuario decide si hacer commit.",
+    "governance": "REGLAMENTARIA. Ningún agente puede saltar de un rol a otro sin autorización EXPLÍCITA del usuario. Triage no pasa a implementer sin que el usuario diga 'sí'. Implementer no pasa a reviewer sin que el usuario diga 'sí'. Reviewer no devuelve a implementer (feedback loop) sin que el usuario diga 'sí'. Cada transición de rol requiere una pausa y autorización humana. El único flujo automático es dentro del mismo rol entre sub-nodos."
+  },
+  "statuses": {
+    "pending": "Nodo creado por triage, listo para ser tomado",
+    "in_progress": "Nodo siendo ejecutado por su rol asignado",
+    "awaiting_review": "Nodo completado por implementer, esperando revisión del reviewer",
+    "done": "Nodo aprobado por reviewer — estado terminal",
+    "feedback": "Nodo rechazado por reviewer, requiere cambios — vuelve a in_progress"
+  },
+  "status_transitions": {
+    "triage_to_implementer": "pending → in_progress",
+    "implementer_to_reviewer": "in_progress → awaiting_review",
+    "reviewer_approve": "awaiting_review → done",
+    "reviewer_reject": "awaiting_review → feedback → in_progress"
+  },
+  "nodes": [
+    {
+      "id": "triage",
+      "type": "role",
+      "atomic": false,
+      "description": "Analiza requests entrantes y determina curso de acción con descomposición atómica",
+      "decomposition": {
+        "strategy": "by-impact-scope",
+        "rules": [
+          "issue toca backend + frontend → dividir por capa",
+          "issue toca múltiples módulos → dividir por módulo",
+          "issue toca 1 archivo o 1 módulo → nodo atómico directo",
+          "issue es vago o incompleto → nodo de exploración previa",
+          "el triage DEBE determinar si cada nodo atómico requiere tests"
+        ]
+      },
+      "subnodes": [
+        {
+          "id": "triage.understand",
+          "atomic": true,
+          "description": "Entender el pedido: qué pide, por qué, para quién"
+        },
+        {
+          "id": "triage.analyze",
+          "atomic": false,
+          "description": "Analizar impacto en el código existente — puede descomponerse por módulo o capa",
+          "decomposition": {
+            "strategy": "by-module",
+            "rules": [
+              "backend module, frontend component, shared lib → cada uno es un sub-nodo analyze",
+              "cada sub-nodo analyze debe leer los archivos relevantes y reportar impacto"
+            ]
+          }
+        },
+        {
+          "id": "triage.route",
+          "atomic": true,
+          "description": "Decidir acción concreta: explorar más, implementar directo, diferir, o rechazar con justificación. DEBE marcar requires_tests en cada nodo atómico resultante."
+        }
+      ]
+    },
+    {
+      "id": "implementer",
+      "type": "role",
+      "atomic": false,
+      "description": "Ejecuta cambios invocando expert skills según el stack del nodo, crea tests donde triage lo indique, y marca el nodo como awaiting_review (NUNCA done)",
+      "decomposition": {
+        "strategy": "by-task",
+        "rules": [
+          "cada tarea del plan → un sub-nodo implementer atómico",
+          "un implementer atómico NO puede abarcar más de un módulo o responsabilidad",
+          "debe invocar expert-angular si el nodo toca frontend",
+          "debe invocar expert-nestjs si el nodo toca backend",
+          "debe invocar expert-postgresql si el nodo toca base de datos",
+          "debe crear archivos de test SI triage marcó requires_tests=true en el nodo",
+          "el estado final del nodo DEBE ser awaiting_review, JAMÁS done"
+        ],
+        "skill_invocation": {
+          "strategy": "by-stack",
+          "mapping": {
+            "frontend": ["expert-angular"],
+            "backend": ["expert-nestjs"],
+            "database": ["expert-postgresql"],
+            "backend+database": ["expert-nestjs", "expert-postgresql"],
+            "fullstack": ["expert-angular", "expert-nestjs", "expert-postgresql"]
+          }
+        }
+      }
+    },
+    {
+      "id": "reviewer",
+      "type": "role",
+      "atomic": false,
+      "description": "Valida implementación contra especificaciones, ejecuta tests, y marca nodos como done (único rol con permiso para estado terminal)",
+      "decomposition": {
+        "strategy": "by-implementer-node",
+        "rules": [
+          "cada nodo implementer atómico → su correspondiente reviewer atómico",
+          "reviewer puede rechazar → feedback loop al implementer (status → feedback)",
+          "reviewer es el UNICO que puede marcar un nodo como done",
+          "reviewer NO puede rechazar por estilo personal — solo por incumplimiento de specs o estándares del proyecto",
+          "reviewer DEBE ejecutar los tests si el nodo tiene requires_tests=true"
+        ]
+      }
+    },
+    {
+      "id": "reporte",
+      "type": "role",
+      "atomic": false,
+      "description": "Genera informe con archivos creados/modificados y justificación de cambios; entrega mensaje de commit siguiendo Conventional Commits",
+      "decomposition": {
+        "strategy": "sequential",
+        "rules": [
+          "cada nodo done del reviewer → un reporte",
+          "agrupar nodos done relacionados → un solo reporte y commit",
+          "invocar skill reporte para generar el informe estructurado",
+          "NO modificar código — solo lectura + generación de texto",
+          "el reporte se entrega al usuario, NO se hace commit automáticamente",
+          "el usuario decide cuándo hacer el commit y si agrupa varios nodos"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "triage",
+      "to": "implementer",
+      "label": "issue especificado y descompuesto en nodos atómicos",
+      "condition": "todos los sub-nodos de triage deben estar resueltos y atomic=true. Cada nodo debe tener status=pending y requires_tests definido."
+    },
+    {
+      "from": "implementer",
+      "to": "reviewer",
+      "label": "implementación lista para revisar",
+      "condition": "cada nodo implementer atómico completado con código + tests (si requires_tests=true). Status debe ser awaiting_review."
+    },
+    {
+      "from": "reviewer",
+      "to": "implementer",
+      "label": "requiere cambios",
+      "type": "feedback",
+      "condition": "reviewer rechaza uno o más nodos atómicos. Status del nodo pasa de awaiting_review a feedback, luego a in_progress."
+    },
+    {
+      "from": "reviewer",
+      "to": "reporte",
+      "label": "nodo aprobado — generar informe y commit message",
+      "condition": "reviewer aprueba el nodo. Status pasa a done. Se invoca reporte para generar informe y commit message."
+    },
+    {
+      "from": "reporte",
+      "to": "terminal",
+      "label": "informe entregado al usuario",
+      "condition": "reporte generado y presentado al usuario. El usuario decide si hace commit ahora, ajusta el mensaje, o agrupa nodos. No hay commit automático."
+    }
+  ]
+}

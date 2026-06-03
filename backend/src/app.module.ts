@@ -10,6 +10,10 @@ import { getDatabaseConfig } from './config/database.config';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { RolesModule } from './modules/roles/roles.module';
+import { ResidentialModule } from './modules/residential/residential.module';
+import { ParkingModule } from './modules/parking/parking.module';
+import { ResidentsModule } from './modules/residents/residents.module';
+import { VisitorsModule } from './modules/visitors/visitors.module';
 
 @Module({
   imports: [
@@ -35,6 +39,10 @@ import { RolesModule } from './modules/roles/roles.module';
     TenantsModule,
     AccountsModule,
     RolesModule,
+    ResidentialModule,
+    ResidentsModule,
+    VisitorsModule,
+    ParkingModule,
   ],
   controllers: [AppController],
   providers: [
