@@ -16,6 +16,8 @@ import { ResidentsModule } from './modules/residents/residents.module';
 import { VisitorsModule } from './modules/visitors/visitors.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { RequestsModule } from './modules/requests/requests.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { PqrsModule } from './modules/pqrs/pqrs.module';
 
 @Module({
   imports: [
@@ -46,6 +48,8 @@ import { RequestsModule } from './modules/requests/requests.module';
     VisitorsModule,
     BillingModule,
     RequestsModule,
+    NotificationsModule,
+    PqrsModule,
     ParkingModule,
   ],
   controllers: [AppController],
