@@ -15,6 +15,7 @@ import { ParkingModule } from './modules/parking/parking.module';
 import { ResidentsModule } from './modules/residents/residents.module';
 import { VisitorsModule } from './modules/visitors/visitors.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { RequestsModule } from './modules/requests/requests.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { BillingModule } from './modules/billing/billing.module';
     ResidentsModule,
     VisitorsModule,
     BillingModule,
+    RequestsModule,
     ParkingModule,
   ],
   controllers: [AppController],
